@@ -6,37 +6,44 @@ using UnityEngine.UI;
 using SaveSystem;
 using TMPro;
 
-public class PauseMenu : MonoBehaviour
+public class PauseMenuHandler : MonoBehaviour
 {
+
     public GameObject settingsMenuPanel;
     public GameObject pauseMenuPanel;
 
+    [SerializeField] private GameObject pauseMenuBackground;
     [SerializeField] private TextMeshProUGUI menuText;
     [SerializeField] private TextMeshProUGUI exitText;
 
-    public static PauseMenu instance;
     void Awake()
     {
         Time.timeScale = 1;
         #region NotNullChecks
-        if (settingsMenuPanel == null)
+        if (pauseMenuBackground == null)
         {
-            Debug.LogError("Settings Panel not found.");
+            Debug.LogError("pauseMenuBackground not set.");
         }
-        if (pauseMenuPanel == null)
-        {
-            Debug.LogError("Pause Panel not found.");
-        }
-        #endregion
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(this.gameObject);
-        }
-        else
-        {
-            Destroy(this.gameObject);
-        }
+    }
+
+    void ResumeGame()
+    {
+        pauseMenuBackground.SetActive(false);
+    }
+
+    void RestartGame()
+    {
+        GameManager.instance.StartNewGame();
+    }
+
+    void OpenSettingsMenu()
+    {
+        GameManager.instance.ShowSettingsMenu();
+    }
+
+    void ReturnToMainMenu()
+    {
+        GameManager.instance.Lad
     }
 
     void Update()

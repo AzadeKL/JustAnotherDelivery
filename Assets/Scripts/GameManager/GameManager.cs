@@ -2,12 +2,14 @@ using SaveSystem;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+using UnityEditor.SearchService;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour, ISaveable
 {
-    public enum SceneIndex
+    public enum GameScene
     {
         BootstrapScene,
         MainMenuScene,
@@ -32,6 +34,7 @@ public class GameManager : MonoBehaviour, ISaveable
     public RandomGameObjectGenerator packageIconGen;
     public RandomStringGenerator packageAddressGen;
 
+    private GameObject settingsMenu;
     private TimeSystem timeSystem;
     private Inventory inventory;
 
@@ -90,10 +93,13 @@ public class GameManager : MonoBehaviour, ISaveable
 
     private void Start()
     {
+        settingsMenu = GameObject.FindGameObjectWithTag("SettingsMenu");
+        HideSettingsMenu();
         timeSystem = GameObject.FindGameObjectWithTag("TimeSystem").GetComponent<TimeSystem>();
+        timeSystem.StopTime();
         inventory = GameObject.FindGameObjectWithTag("Inventory").GetComponent<Inventory>();
         isGamePaused.value = false;
-        OnSceneLoaded(SceneManager.GetActiveScene(), LoadSceneMode.Single);
+        InitGameData();
 
 #if !UNITY_EDITOR
         if (SceneManager.GetActiveScene().buildIndex == 0)
@@ -101,38 +107,6 @@ public class GameManager : MonoBehaviour, ISaveable
             SceneManager.LoadScene(1);
         }
 #endif
-    }
-
-    void OnEnable()
-    {
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-
-    void OnDisable()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
-    }
-
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        if (timeSystem == null) return;
-
-        switch ((SceneIndex)scene.buildIndex)
-        {
-            case SceneIndex.BootstrapScene:
-            case SceneIndex.MainMenuScene:
-                break;
-            case SceneIndex.SortingInventoryScene:
-            case SceneIndex.PackageDeliveryScene:
-                timeSystem.StartTime();
-                break;
-            case SceneIndex.UpgradeMenuScene:
-                timeSystem.StopTime();
-                break;
-            default:
-                Debug.LogError("Unrecognized scene: " + SceneManager.GetActiveScene().buildIndex);
-                break;
-        };
     }
 
     public bool IsGamePaused()
@@ -150,19 +124,42 @@ public class GameManager : MonoBehaviour, ISaveable
         isGamePaused.value = false;
     }
 
+    public void LoadScene(GameScene gameScene)
+    {
+        SceneManager.LoadScene((int)gameScene);
+
+        if (timeSystem == null) return;
+
+        switch (gameScene)
+        {
+            case GameScene.BootstrapScene:
+            case GameScene.MainMenuScene:
+                break;
+            case GameScene.SortingInventoryScene:
+            case GameScene.PackageDeliveryScene:
+                timeSystem.StartTime();
+                break;
+            case GameScene.UpgradeMenuScene:
+                timeSystem.StopTime();
+                break;
+            default:
+                Debug.LogError("Unrecognized scene: " + SceneManager.GetActiveScene().buildIndex);
+                break;
+        }
+    }
+
     public void LoadNextScene()
     {
-        int index = SceneManager.GetActiveScene().buildIndex;
-        int next_index = index + 1;
-        switch ((SceneIndex)SceneManager.GetActiveScene().buildIndex)
+        GameScene gameScene = (GameScene)SceneManager.GetActiveScene().buildIndex;
+        switch (gameScene)
         {
-            case SceneIndex.BootstrapScene:
-            case SceneIndex.MainMenuScene:
-            case SceneIndex.SortingInventoryScene:
-            case SceneIndex.PackageDeliveryScene:
-                SceneManager.LoadScene(next_index);
+            case GameScene.BootstrapScene:
+            case GameScene.MainMenuScene:
+            case GameScene.SortingInventoryScene:
+            case GameScene.PackageDeliveryScene:
+                LoadScene(gameScene + 1);
                 break;
-            case SceneIndex.UpgradeMenuScene:
+            case GameScene.UpgradeMenuScene:
                 StartNextDay();
                 break;
             default:
@@ -185,35 +182,56 @@ public class GameManager : MonoBehaviour, ISaveable
         timeSystem.AdvanceTime(inteTime);
     }
 
+    public void InitGameData()
+    {
+        timeSystem.SetTime(0f);
+        money = 0;
+        inventoryConfigIndex = 0;
+        speedMultiplier = 1.0f;
+        packageValueMultiplier = 1.0f;
+    }
+
+    public void ResetGameData()
+    {
+        SaveSystem.DataManager.instance.ResetGameData();
+        InitGameData();
+    }
+
     public void RestartDay()
     {
+        SaveSystem.DataManager.instance.LoadGame();
         timeSystem.ResetDay();
-        inventory.Reset();
-        SceneManager.LoadScene((int)SceneIndex.SortingInventoryScene);
+        inventory.Reset(); inventory.Reset();
+        LoadScene(GameScene.SortingInventoryScene);
     }
 
     public void StartNextDay()
     {
         timeSystem.SetNextDay();
-        inventory.Reset();
-        SceneManager.LoadScene((int)SceneIndex.SortingInventoryScene);
+        inventory.Reset(); inventory.Reset();
+        LoadScene(GameScene.SortingInventoryScene);
     }
 
     public void StartNewGame()
     {
-        timeSystem.SetTime(0f);
-        SaveSystem.DataManager.instance.ResetGameData();
-        money = 0;
-        inventoryConfigIndex = 0;
-        speedMultiplier = 1.0f;
-        packageValueMultiplier = 1.0f;
+        ResetGameData();
         RestartDay();
     }
 
     public void ContinueGame()
     {
         SaveSystem.DataManager.instance.LoadGame();
-        SceneManager.LoadScene(SaveSystem.DataManager.instance.GetLastSceneIndex());
+        LoadScene((GameScene)SaveSystem.DataManager.instance.GetLastSceneIndex());
+    }
+
+    public void ShowSettingsMenu()
+    {
+        settingsMenu.SetActive(true);
+    }
+
+    public void HideSettingsMenu()
+    {
+        settingsMenu.SetActive(false);
     }
 
     public void RewardForDelivery(Package package)
