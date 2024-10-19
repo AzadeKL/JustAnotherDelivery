@@ -10,8 +10,9 @@ public class NavButtonScript : MonoBehaviour
     private MovementScript movementScript;
     private bool isDirectionValid;
     private bool isDirectionAccessible;
+    public bool isThisUI = true;
 
-    private void Start()
+    private void Awake()
     {
         playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject == null)
@@ -22,10 +23,13 @@ public class NavButtonScript : MonoBehaviour
         movementScript = playerObject.GetComponent<MovementScript>();
         if (movementScript == null)
         {
-            throw new System.Exception("ButtonScript needs a movement script to move. Player object has no component of the type 'PrototypeMovementScript'");
+            throw new System.Exception("ButtonScript needs a movement script to move. Player object has no component of the type 'MovementScript'");
         }
 
-        CheckCanMove();
+        if (isThisUI)
+        {
+            CheckCanMove();
+        }
     }
 
     public void MovePlayer()

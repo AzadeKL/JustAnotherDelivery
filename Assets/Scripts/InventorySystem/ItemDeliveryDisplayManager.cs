@@ -6,7 +6,8 @@ using UnityEngine;
 public class ItemDeliveryDisplayManager : MonoBehaviour, IItemDroppable
 {
     public GameObject deliveryBox;
-    private Inventory inventory;
+    private Inventory inventory; 
+    private NavigationMenuHandler navigationManager;
 
     void Start() 
     {
@@ -19,6 +20,12 @@ public class ItemDeliveryDisplayManager : MonoBehaviour, IItemDroppable
         if (inventory == null)
         {
             Debug.LogError("inventory is not set");
+        }
+
+        navigationManager = GameObject.FindGameObjectWithTag("NavigationManager").GetComponent<NavigationMenuHandler>();
+        if (navigationManager == null)
+        {
+            Debug.LogError("Failed to locate NavigationMenuHandler");
         }
     }
 
@@ -34,10 +41,23 @@ public class ItemDeliveryDisplayManager : MonoBehaviour, IItemDroppable
 
         GameManager.instance.RewardForDelivery(package.data);
         Destroy(itemGameObject);
+
+        deliveryBox.SetActive(false);
+        navigationManager.SetMessage("Thank you for the delivery!");
     }
 
     public bool IsValidDropPosition(DragDropObject item)
     {
+        Characters activeNpc = navigationManager.GetActiveNPC();
+        GameObject itemGameObject = item.gameObject;
+        DragDropPackage package = itemGameObject.GetComponent<DragDropPackage>();
+
+        if (package.data.address.fullName != activeNpc.fullName)
+        {
+            navigationManager.SetMessage("This is not mine!");
+            return false;
+        }
+
         return true;
     }
 }

@@ -38,7 +38,7 @@ public class InventoryDisplayManager : MonoBehaviour, IItemDraggable, IItemDropp
                 Debug.LogError("Failed to locate inventory");
             }
         }
-        inventoryConfig = inventory.inventoryConfig;
+        inventoryConfig = GameManager.instance.inventoryConfigs[GameManager.instance.inventoryConfigIndex];
         if (inventoryConfig == null)
         {
             Debug.LogError("Failed to locate inventoryConfig");
@@ -55,6 +55,9 @@ public class InventoryDisplayManager : MonoBehaviour, IItemDraggable, IItemDropp
 
         // Update the inventory label
         inventoryLabel.text = inventoryConfig.label;
+
+        // Put the inventory label on top
+        inventoryLabel.transform.SetAsLastSibling();
 
         // Locate the grid
         gridObject = inventoryLayout.transform.gameObject.transform.Find("Grid").gameObject;
@@ -235,5 +238,8 @@ public class InventoryDisplayManager : MonoBehaviour, IItemDraggable, IItemDropp
 
         // Add the item to the inventory
         inventory.AddItem(item.gameObject);
+
+        // Put the inventory label on top
+        inventoryLabel.transform.SetAsLastSibling();
     }
 }

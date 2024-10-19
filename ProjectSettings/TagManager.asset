@@ -9,6 +9,8 @@ TagManager:
   - UICamera
   - Inventory
   - TimeoutPanel
+  - NavigationManager
+  - MinimapManager
   layers:
   - Default
   - TransparentFX

@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class GameManager : MonoBehaviour
+public class GameManager : MonoBehaviour, ISaveable
 {
-    public enum SceneIndex
+    public enum GameScene
     {
         BootstrapScene,
         MainMenuScene,
@@ -18,14 +18,62 @@ public class GameManager : MonoBehaviour
     public static GameManager instance;
 
     [SerializeField] private BoolVariable isGamePaused;
+    [SerializeField] private int money;
+    [SerializeField] private int baseMinutesPerMovement = 20;
+    [SerializeField] private int baseMinutesPerInteraction = 5;
 
     [Header("Data for upgrades")]
     public List<InventoryConfigObject> inventoryConfigs;
+    public int inventoryConfigIndex = 0;
+    public float speedMultiplier = 1f;
+    public float packageValueMultiplier = 1f;
+
+    [Header("Data for plot")]
+    public NPCCollection npcCollection;
+    public RandomGameObjectGenerator packageIconGen;
 
     private TimeSystem timeSystem;
     private Inventory inventory;
 
-    private float money;
+    public void Save(GameData gameData)
+    {
+        var data = gameData.gameManagerData;
+        ISaveable.AddKey(data, "money", money);
+        ISaveable.AddKey(data, "inventoryConfigIndex", inventoryConfigIndex);
+        ISaveable.AddKey(data, "speedMultiplier", speedMultiplier);
+        ISaveable.AddKey(data, "packageValueMultiplier", packageValueMultiplier);
+    }
+
+    public bool Load(GameData gameData)
+    {
+        foreach (var key_value in gameData.gameManagerData)
+        {
+            var parsed = ISaveable.ParseKey(key_value);
+            string key = parsed[0];
+            string value = parsed[1];
+            //Debug.Log("Loading key: " + key + " value: " + value);
+            switch (key)
+            {
+                case "money":
+                    money = Convert.ToInt32(value);
+                    break;
+                case "inventoryConfigIndex":
+                    inventoryConfigIndex = Convert.ToInt32(value);
+                    break;
+                case "speedMultiplier":
+                    speedMultiplier = (float)Convert.ToDouble(value);
+                    break;
+                case "packageValueMultiplier":
+                    packageValueMultiplier = (float)Convert.ToDouble(value);
+                    break;
+                default:
+                    Debug.LogError("Unrecognized key: " + key + " value: " + value);
+                    break;
+            }
+        }
+
+        return true;
+    }
 
     private void Awake()
     {
@@ -69,15 +117,16 @@ public class GameManager : MonoBehaviour
     {
         if (timeSystem == null) return;
 
-        switch ((SceneIndex)scene.buildIndex)
+        switch ((GameScene)scene.buildIndex)
         {
-            case SceneIndex.BootstrapScene:
-            case SceneIndex.MainMenuScene:
-            case SceneIndex.SortingInventoryScene:
-            case SceneIndex.PackageDeliveryScene:
+            case GameScene.BootstrapScene:
+            case GameScene.MainMenuScene:
+                break;
+            case GameScene.SortingInventoryScene:
+            case GameScene.PackageDeliveryScene:
                 timeSystem.StartTime();
                 break;
-            case SceneIndex.UpgradeMenuScene:
+            case GameScene.UpgradeMenuScene:
                 timeSystem.StopTime();
                 break;
             default:
@@ -101,19 +150,25 @@ public class GameManager : MonoBehaviour
         isGamePaused.value = false;
     }
 
+    public void LoadScene(GameScene sceneIndex)
+    {
+        // TODO: Reorganize scene loading
+        SceneManager.LoadScene((int)sceneIndex);
+    }
+
     public void LoadNextScene()
     {
         int index = SceneManager.GetActiveScene().buildIndex;
         int next_index = index + 1;
-        switch ((SceneIndex)SceneManager.GetActiveScene().buildIndex)
+        switch ((GameScene)SceneManager.GetActiveScene().buildIndex)
         {
-            case SceneIndex.BootstrapScene:
-            case SceneIndex.MainMenuScene:
-            case SceneIndex.SortingInventoryScene:
-            case SceneIndex.PackageDeliveryScene:
+            case GameScene.BootstrapScene:
+            case GameScene.MainMenuScene:
+            case GameScene.SortingInventoryScene:
+            case GameScene.PackageDeliveryScene:
                 SceneManager.LoadScene(next_index);
                 break;
-            case SceneIndex.UpgradeMenuScene:
+            case GameScene.UpgradeMenuScene:
                 StartNextDay();
                 break;
             default:
@@ -122,18 +177,32 @@ public class GameManager : MonoBehaviour
         };
     }
 
+    public void SpendMovementTime()
+    {
+        float baseTime = baseMinutesPerMovement / 60f;
+        float moveTime = baseTime / speedMultiplier;
+        timeSystem.AdvanceTime(moveTime);
+    }
+
+    public void SpendInteractionTime()
+    {
+        float baseTime = baseMinutesPerInteraction / 60f;
+        float inteTime = baseTime / speedMultiplier;
+        timeSystem.AdvanceTime(inteTime);
+    }
+
     public void RestartDay()
     {
         timeSystem.ResetDay();
         inventory.Reset();
-        SceneManager.LoadScene((int)SceneIndex.SortingInventoryScene);
+        SceneManager.LoadScene((int)GameScene.SortingInventoryScene);
     }
 
     public void StartNextDay()
     {
         timeSystem.SetNextDay();
         inventory.Reset();
-        SceneManager.LoadScene((int)SceneIndex.SortingInventoryScene);
+        SceneManager.LoadScene((int)GameScene.SortingInventoryScene);
     }
 
     public void StartNewGame()
@@ -141,6 +210,9 @@ public class GameManager : MonoBehaviour
         timeSystem.SetTime(0f);
         SaveSystem.DataManager.instance.ResetGameData();
         money = 0;
+        inventoryConfigIndex = 0;
+        speedMultiplier = 1.0f;
+        packageValueMultiplier = 1.0f;
         RestartDay();
     }
 
@@ -152,11 +224,31 @@ public class GameManager : MonoBehaviour
 
     public void RewardForDelivery(Package package)
     {
-        money++;
+        money += package.cost;
     }
 
-    public float GetMoney()
+    public int GetMoney()
     {
         return money;
+    }
+
+    public bool SpendMoney(int amount)
+    {
+        if (money < amount)
+        {
+            return false;
+        }
+        money -= amount;
+        return true;
+    }
+
+    public InventoryConfigObject GetInventoryConfig()
+    {
+        return inventoryConfigs[inventoryConfigIndex];
+    }
+
+    public InventoryConfigObject GetInventoryConfig(int index)
+    {
+        return ((index >= 0) && (index < inventoryConfigs.Count)) ? inventoryConfigs[index] : null;
     }
 }

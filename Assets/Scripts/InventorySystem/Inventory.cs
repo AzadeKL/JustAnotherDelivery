@@ -1,19 +1,17 @@
 using DragDrop;
+using JetBrains.Annotations;
 using SaveSystem;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Xml.Linq;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class Inventory : MonoBehaviour, ISaveable
 {
-    [Header("Inventory Configuration")]
-    public InventoryConfigObject inventoryConfig;
-    public RandomGameObjectGenerator packageIconGen;
-    public RandomStringGenerator packageAddressGen;
-
     [Header("Current Inventory")]
     public List<Package> packages = new List<Package>();
 
@@ -33,50 +31,29 @@ public class Inventory : MonoBehaviour, ISaveable
 
     public void Save(GameData gameData)
     {
-        gameData.inventoryData = new List<string>();
-        var data = gameData.inventoryData;
-        ISaveable.AddKey(data, "inventoryConfigLabel", inventoryConfig.label);
-
-        gameData.inventoryData = new List<string>();
-        data = gameData.inventoryPackagesData;
-        foreach ( var package in packages)
+        gameData.inventoryPackagesData = new List<string>();
+        var data = gameData.inventoryPackagesData;
+        foreach (var package in packages)
         {
-            ISaveable.AddKey(data, package.iconName, package.address);
+            data.Add(package.ToString());
         }
     }
 
     public bool Load(GameData gameData)
     {
-        foreach (var key_value in gameData.inventoryData)
-        {
-            var parsed = ISaveable.ParseKey(key_value);
-            string key = parsed[0];
-            string value = parsed[1];
-            //Debug.Log("Loading key: " + key + " value: " + value);
-            switch (key)
-            {
-                case "inventoryConfigLabel":
-                    inventoryConfig = GameManager.instance.inventoryConfigs.Find(x => x.label == value);
-                    break;
-            }
-        }
-
         packages = new List<Package>();
-        foreach (var key_value in gameData.inventoryPackagesData)
+        foreach (var val in gameData.inventoryPackagesData)
         {
-            var parsed = ISaveable.ParseKey(key_value);
-            string iconName = parsed[0];
-            string address = parsed[1];
-            packages.Add(new Package(iconName, address));
+            packages.Add(new Package(val));
         }
 
         return true;
     }
 
-    public void AddItem(string iconName, string address)
+    public void AddItem(string iconName, string fullName, string address, int cost)
     {
-        packages.Add(new Package(iconName, address));
-        Debug.Log("Added item to Inventory: " + address);
+        packages.Add(new Package(iconName, fullName, address, cost));
+        Debug.Log("Added item to Inventory: " + fullName + "@" + address);
     }
 
     public void Reset()
@@ -130,14 +107,81 @@ public class Inventory : MonoBehaviour, ISaveable
 }
 
 [Serializable]
+public class Address
+{
+    public string fullName;
+    public string address;
+
+    public Address(string fullName, string address)
+    {
+        this.fullName = fullName;
+        this.address = address;
+    }
+
+    public Address(Characters character)
+    {
+        this.fullName = character.fullName;
+        this.address = character.waypoint.GetFullAddress();
+    }
+
+    // Helper for Load
+    public Address(string attributes)
+    {
+        var parsed = attributes.Split('@');
+        this.fullName = parsed[0];
+        this.address = parsed[1];
+    }
+
+    // Helper for Save
+    public override string ToString()
+    {
+        return string.Join("@", fullName, address);
+    }
+
+    public Address Clone()
+    {
+        return new Address(fullName, address);
+    }
+}
+
+[Serializable]
 public class Package
 {
     public string iconName;
-    public string address;
+    public Address address;
+    public int cost;
 
-    public Package(string iconName, string address)
+    public Package(string iconName, Address address, int cost)
     {
         this.iconName = iconName;
         this.address = address;
+        this.cost = cost;
+    }
+
+    public Package(string iconName, string fullName, string address, int cost)
+    {
+        this.iconName = iconName;
+        this.address = new Address(fullName, address);
+        this.cost = cost;
+    }
+
+    // Helper for Load
+    public Package(string attributes)
+    {
+        var parsed = attributes.Split(':');
+        this.iconName = parsed[0];
+        this.address = new Address(parsed[1]);
+        this.cost = Convert.ToInt32(parsed[2]);
+    }
+
+    // Helper for Save
+    public override string ToString()
+    {
+        return string.Join(":", iconName, address, cost);
+    }
+
+    public string ToDisplayString()
+    {
+        return address.ToString() + ", Coins: " + cost;
     }
 }

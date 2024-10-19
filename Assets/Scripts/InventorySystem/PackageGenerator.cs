@@ -9,9 +9,11 @@ using UnityEngine.UI;
 
 public class PackageGenerator : MonoBehaviour, IDragDropGenerator
 {
-    [SerializeField] private RandomGameObjectGenerator packageIconGen;
-    [SerializeField] private RandomStringGenerator packageAddressGen;
+    [Header("Required Fields")]
+    [SerializeField] private RandomAddressGenerator packageAddressGen;
     [SerializeField] private float imageScale = 75;
+    [Header("Derived Fields")]
+    [SerializeField] private RandomGameObjectGenerator packageIconGen;
 
     private Inventory inventory;
 
@@ -22,21 +24,33 @@ public class PackageGenerator : MonoBehaviour, IDragDropGenerator
         {
             Debug.LogError("Failed to locate Inventory");
         }
-        packageIconGen = inventory.packageIconGen;
+        packageIconGen = GameManager.instance.packageIconGen;
         if (packageIconGen == null)
         {
             Debug.LogError("Failed to locate packageIconGen");
         }
-        packageAddressGen = inventory.packageAddressGen.Clone();
         if (packageAddressGen == null)
         {
             Debug.LogError("Failed to locate packageAddressGen");
         }
+        packageAddressGen.Clear();
+        foreach (var character in GameManager.instance.npcCollection.NPCList)
+        {
+            packageAddressGen.AddEntry(new Address(character));
+        }
+    }
+
+    private int CalcCost(GameObject icon)
+    {
+        // Arbitrary cost value, currently based on icon size
+        var rect = icon.GetComponent<RectTransform>();
+        float cost = Mathf.Max(1, rect.sizeDelta.x * rect.sizeDelta.y);
+        return (int)(GameManager.instance.packageValueMultiplier * cost);
     }
 
     public DragDropObject CreateDragDrop(GameObject parent)
     {
-        string address = packageAddressGen.GetEntry();
+        Address address = packageAddressGen.GetEntry();
         if (address == null)
         {
             return null;
@@ -54,7 +68,7 @@ public class PackageGenerator : MonoBehaviour, IDragDropGenerator
         icon.transform.position = parent.transform.position;
 
         var dragDrop = icon.AddComponent<DragDropPackage>();
-        dragDrop.data = new Package(packageIcon.name, address);
+        dragDrop.data = new Package(packageIcon.name, address, CalcCost(icon));
 
         return dragDrop;
     }

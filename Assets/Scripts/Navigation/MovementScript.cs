@@ -70,6 +70,8 @@ public class MovementScript : MonoBehaviour
         playerTransform.rotation = Quaternion.Euler(currentWaypoint.rotation.x,
                                                     currentWaypoint.rotation.y,
                                                     currentWaypoint.rotation.z);
+
+        GameManager.instance.SpendMovementTime();
     }
 
     public bool ValidateDirection(Direction direction) { 
@@ -113,5 +115,10 @@ public class MovementScript : MonoBehaviour
         playerTransform.rotation = Quaternion.Euler(currentWaypoint.rotation.x,
                                                     currentWaypoint.rotation.y,
                                                     currentWaypoint.rotation.z);
+    }
+
+    public Waypoints GetCurrentWaypoint()
+    {
+        return currentWaypoint;
     }
 }
